@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotating Heptagons</title>
+    <style>
+        body {
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Obracające się siedmiokąty</h1>
+    <canvas id="thecanvas" width="600" height="400"></canvas>
+    <script>
+        var canvas;
+        var graphics;
+
+        var X_LEFT = -4;
+        var X_RIGHT = 4;
+        var Y_BOTTOM = -3;
+        var Y_TOP = 3;
+
+        var BACKGROUND = "white";
+
+        var pixelSize;
+
+        var frameNumber = 0;
+
+        var world;
+
+        var rotatingShapes = [];
+
+        function createWorld() {
+            world = new CompoundObject();
+
+            function createSeesaw(x, y, scale, color) {
+                var seesaw = new CompoundObject();
+
+                var base = new TransformedObject(filledTriangle);
+                base.setScale(1.5 * scale, 2 * scale).setColor(color).setTranslation(x, y - 1.5 * scale);
+                seesaw.add(base);
+
+                var plank = new TransformedObject(filledRect);
+                plank.setScale(3 * scale, 0.3 * scale).setColor("red").setTranslation(x, y + 0.5 * scale).setRotation(-15);
+                seesaw.add(plank);
+
+                function createRotatingHeptagon(offsetX, yOffset, rotation) {
+                    var heptagon = new TransformedObject(filledHeptagon);
+                    heptagon.setScale(1 * scale, 1 * scale).setColor("black")
+                        .setTranslation(x + offsetX, y + yOffset) // Różne wysokości
+                        .setRotation(rotation); // Różne kąty nachylenia
+                    rotatingShapes.push(heptagon);
+                    seesaw.add(heptagon);
+                }
+
+            createRotatingHeptagon(-1.3 * scale, 0.85 * scale, -20); // Lewy wyżej i bardziej pochylony
+            createRotatingHeptagon(1.3 * scale, 0.25 * scale, -10);  // Prawy niżej i mniej pochylony
+
+            world.add(seesaw);
+}
+
+
+            createSeesaw(-1.5, -1, 1, "blue");
+            createSeesaw(1.5, 0.5, 0.7, "green");
+            createSeesaw(-1.5, 1.8, 0.5, "purple");
+        }
+
+        function updateFrame() {
+            frameNumber++;
+            rotatingShapes.forEach(shape => {
+                shape.setRotation(frameNumber * 3);
+            });
+        }
+
+        function SceneGraphNode() {
+            this.fillColor = null;
+            this.strokeColor = null;
+        }
+        SceneGraphNode.prototype.doDraw = function (g) {
+            throw "doDraw not implemented in SceneGraphNode";
+        };
+        SceneGraphNode.prototype.draw = function (g) {
+            graphics.save();
+            if (this.fillColor) {
+                g.fillStyle = this.fillColor;
+            }
+            if (this.strokeColor) {
+                g.strokeStyle = this.strokeColor;
+            }
+            this.doDraw(g);
+            graphics.restore();
+        };
+        SceneGraphNode.prototype.setFillColor = function (color) {
+            this.fillColor = color;
+            return this;
+        };
+        SceneGraphNode.prototype.setStrokeColor = function (color) {
+            this.strokeColor = color;
+            return this;
+        };
+        SceneGraphNode.prototype.setColor = function (color) {
+            this.fillColor = color;
+            this.strokeColor = color;
+            return this;
+        };
+
+        function CompoundObject() {
+            SceneGraphNode.call(this);
+            this.subobjects = [];
+        }
+        CompoundObject.prototype = new SceneGraphNode();
+        CompoundObject.prototype.add = function (node) {
+            this.subobjects.push(node);
+            return this;
+        };
+        CompoundObject.prototype.doDraw = function (g) {
+            for (var i = 0; i < this.subobjects.length; i++)
+                this.subobjects[i].draw(g);
+        };
+
+        function TransformedObject(object) {
+            SceneGraphNode.call(this);
+            this.object = object;
+            this.rotationInDegrees = 0;
+            this.scaleX = 1;
+            this.scaleY = 1;
+            this.translateX = 0;
+            this.translateY = 0;
+        }
+        TransformedObject.prototype = new SceneGraphNode();
+        TransformedObject.prototype.setRotation = function (angle) {
+            this.rotationInDegrees = angle;
+            return this;
+        };
+        TransformedObject.prototype.setScale = function (sx, sy) {
+            this.scaleX = sx;
+            this.scaleY = sy;
+            return this;
+        };
+        TransformedObject.prototype.setTranslation = function (dx, dy) {
+            this.translateX = dx;
+            this.translateY = dy;
+            return this;
+        };
+        TransformedObject.prototype.doDraw = function (g) {
+            g.save();
+            g.translate(this.translateX, this.translateY);
+            g.rotate(this.rotationInDegrees / 180 * Math.PI);
+            g.scale(this.scaleX, this.scaleY);
+            this.object.draw(g);
+            g.restore();
+        };
+
+        var filledRect = new SceneGraphNode();
+        filledRect.doDraw = function (g) {
+            g.fillRect(-0.5, -0.5, 1, 1);
+        };
+
+        var filledTriangle = new SceneGraphNode();
+        filledTriangle.doDraw = function (g) {
+            g.beginPath();
+            g.moveTo(-0.5, 0);
+            g.lineTo(0.5, 0);
+            g.lineTo(0, 1);
+            g.closePath();
+            g.fill();
+        };
+
+        var filledHeptagon = new SceneGraphNode();
+        filledHeptagon.doDraw = function (g) {
+            var angle = Math.PI * 2 / 7;
+            g.beginPath();
+            for (var i = 0; i < 7; i++) {
+                var x = Math.cos(i * angle) * 0.5;
+                var y = Math.sin(i * angle) * 0.5;
+                if (i === 0) {
+                    g.moveTo(x, y);
+                } else {
+                    g.lineTo(x, y);
+                }
+            }
+            g.closePath();
+            g.fill();
+        };
+
+        function draw() {
+            graphics.save();
+            graphics.fillStyle = BACKGROUND;
+            graphics.fillRect(0, 0, canvas.width, canvas.height);
+            graphics.fillStyle = "black";
+            applyLimits(graphics, X_LEFT, X_RIGHT, Y_TOP, Y_BOTTOM, false);
+            graphics.lineWidth = pixelSize;
+            world.draw(graphics);
+            graphics.restore();
+        }
+
+        function applyLimits(g, xleft, xright, ytop, ybottom, preserveAspect) {
+            var width = canvas.width;
+            var height = canvas.height;
+            pixelSize = Math.min((xright - xleft) / width, (ybottom - ytop) / height);
+            g.scale(width / (xright - xleft), height / (ybottom - ytop));
+            g.translate(-xleft, -ytop);
+        }
+
+        function frame() {
+            updateFrame();
+            draw();
+            requestAnimationFrame(frame);
+        }
+
+        function init() {
+            canvas = document.getElementById("thecanvas");
+            graphics = canvas.getContext("2d");
+            createWorld();
+            frame();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
