@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Hierarchiczna Huśtawka</title>
+    <style>
+        body { margin: 0; background: #eee; }
+        canvas { display: block; margin: auto; background: white; }
+    </style>
+</head>
+<body>
+<canvas id="thecanvas" width="800" height="600"></canvas>
+
+<script>
+    var canvas, graphics;
+    var X_LEFT = -4, X_RIGHT = 4, Y_BOTTOM = -3, Y_TOP = 3;
+    var pixelSize;
+    var frameNumber = 0;
+
+    function createFilledRectNode(x, y, width, height, rotation, color) {
+        return {
+            type: "rect", x, y, width, height, rotation, color
+        };
+    }
+
+    function createFilledTriangleNode(x, y, scale, color) {
+        return {
+            type: "triangle", x, y, scale, color
+        };
+    }
+
+    function createFilledHeptagonNode(x, y, scale, rotation, color) {
+        return {
+            type: "heptagon", x, y, scale, rotation, color,
+            animated: true // znacznik do animacji
+        };
+    }
+
+    function createSeesawNode(x, y, scale, triangleColor) {
+        return {
+            type: "seesaw",
+            children: [
+                createFilledTriangleNode(x, y - 0.5 * scale, scale, triangleColor),
+                createFilledRectNode(x, y + 0.5 * scale, 3 * scale, 0.3 * scale, -15, "red"),
+                createFilledHeptagonNode(x - 1.3 * scale, y + 1 * scale, scale, 0, "black"),
+                createFilledHeptagonNode(x + 1.3 * scale, y + 0.3 * scale, scale, 0, "black")
+            ]
+        };
+    }
+
+    function createWorldHierarchy() {
+        return {
+            type: "world",
+            children: [
+                createSeesawNode(-1.5, -1, 1, "blue"),
+                createSeesawNode(1.5, 0.5, 0.7, "green"),
+                createSeesawNode(0, 1.8, 0.5, "purple")
+            ]
+        };
+    }
+
+    function drawNode(node, g) {
+        if (node.type === "world" || node.type === "seesaw") {
+            node.children.forEach(child => drawNode(child, g));
+        } else if (node.type === "rect") {
+            g.save();
+            g.translate(node.x, node.y);
+            g.rotate(node.rotation * Math.PI / 180);
+            g.fillStyle = node.color;
+            g.fillRect(-node.width / 2, -node.height / 2, node.width, node.height);
+            g.restore();
+        } else if (node.type === "triangle") {
+            g.save();
+            g.translate(node.x, node.y);
+            g.fillStyle = node.color;
+            g.beginPath();
+            g.moveTo(-0.5 * node.scale, 0);
+            g.lineTo(0.5 * node.scale, 0);
+            g.lineTo(0, node.scale);
+            g.closePath();
+            g.fill();
+            g.restore();
+        } else if (node.type === "heptagon") {
+            var angle = Math.PI * 2 / 7;
+            g.save();
+            g.translate(node.x, node.y);
+            g.rotate(node.rotation * Math.PI / 180);
+            g.fillStyle = node.color;
+            g.beginPath();
+            for (var i = 0; i < 7; i++) {
+                var x = Math.cos(i * angle) * 0.5 * node.scale;
+                var y = Math.sin(i * angle) * 0.5 * node.scale;
+                if (i === 0) g.moveTo(x, y);
+                else g.lineTo(x, y);
+            }
+            g.closePath();
+            g.fill();
+            g.restore();
+        }
+    }
+
+    function updateHeptagonRotation(node) {
+        if (node.animated) {
+            node.rotation = frameNumber * 3;
+        }
+        if (node.children) {
+            node.children.forEach(updateHeptagonRotation);
+        }
+    }
+
+    function draw() {
+        graphics.save();
+        graphics.fillStyle = "white";
+        graphics.fillRect(0, 0, canvas.width, canvas.height);
+        applyLimits(graphics, X_LEFT, X_RIGHT, Y_TOP, Y_BOTTOM, false);
+        graphics.lineWidth = pixelSize;
+
+        updateHeptagonRotation(sceneRoot);
+        drawNode(sceneRoot, graphics);
+
+        graphics.restore();
+    }
+
+    function applyLimits(g, xleft, xright, ytop, ybottom, preserveAspect) {
+        var width = canvas.width;
+        var height = canvas.height;
+        pixelSize = Math.min((xright - xleft) / width, (ybottom - ytop) / height);
+        g.scale(width / (xright - xleft), height / (ybottom - ytop));
+        g.translate(-xleft, -ytop);
+    }
+
+    function frame() {
+        frameNumber++;
+        draw();
+        requestAnimationFrame(frame);
+    }
+
+    var sceneRoot;
+
+    function init() {
+        canvas = document.getElementById("thecanvas");
+        graphics = canvas.getContext("2d");
+        sceneRoot = createWorldHierarchy();
+        frame();
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
